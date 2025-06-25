@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 
-# MergeIntervals Build Script
-Write-Host "=== MergeIntervals Build Script ===" -ForegroundColor Cyan
+# HelloWorld Build Script
+Write-Host "=== HelloWorld Build Script ===" -ForegroundColor Cyan
 Write-Host ""
 
 # Clean previous builds

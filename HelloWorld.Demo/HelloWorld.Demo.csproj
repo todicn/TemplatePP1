@@ -5,8 +5,8 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <AssemblyName>ListFile.Demo</AssemblyName>
-    <RootNamespace>ListFile.Demo</RootNamespace>
+    <AssemblyName>HelloWorld.Demo</AssemblyName>
+    <RootNamespace>HelloWorld.Demo</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

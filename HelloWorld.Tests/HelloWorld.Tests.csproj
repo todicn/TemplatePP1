@@ -6,8 +6,8 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
-    <AssemblyName>ListFile.Tests</AssemblyName>
-    <RootNamespace>ListFile.Tests</RootNamespace>
+    <AssemblyName>HelloWorld.Tests</AssemblyName>
+    <RootNamespace>HelloWorld.Tests</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

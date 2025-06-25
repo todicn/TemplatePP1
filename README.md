@@ -1,197 +1,171 @@
-# ListFile - File Line Reader Library
+# HelloWorld Application
 
-A high-performance .NET 8 library for reading the last N lines from files efficiently, with support for both small and large files.
+A simple C# application demonstrating the HelloWorld pattern with clean architecture, dependency injection, and comprehensive testing.
 
-## Features
+## 🚀 Features
 
-- **Efficient File Reading**: Optimized algorithms for reading the last N lines from files
-- **Performance Optimized**: Different strategies for small vs. large files
-- **Thread-Safe**: Safe for concurrent access
-- **Configurable**: Flexible options for file size thresholds and buffer sizes
-- **Async Support**: Both synchronous and asynchronous APIs
-- **Dependency Injection**: Built-in support for Microsoft.Extensions.DependencyInjection
-- **Well-Tested**: Comprehensive unit tests with edge case coverage
+- **Simple Greeting Service**: Basic "Hello, World!" functionality
+- **Personalized Messages**: Customizable greetings with names
+- **Message Service**: Welcome and farewell messages
+- **Configuration Support**: Configurable through appsettings.json or code
+- **Dependency Injection**: Fully integrated with Microsoft.Extensions.DependencyInjection
+- **Comprehensive Testing**: Unit tests with xUnit
+- **Clean Architecture**: Separation of concerns with interfaces and implementations
 
-## Quick Start
+## 🏗️ Project Structure
 
-### Installation
-
-Add the ListFile.Core package to your project:
-
-```xml
-<PackageReference Include="ListFile.Core" Version="1.0.0" />
+```
+HelloWorld/
+├── HelloWorld.Core/                 # Core library
+│   ├── Interfaces/                  # Service contracts
+│   │   ├── IGreeter.cs             # Greeting service interface
+│   │   └── IMessageService.cs     # Message service interface
+│   ├── Implementations/            # Service implementations
+│   │   ├── Greeter.cs              # Greeting service implementation
+│   │   └── MessageService.cs      # Message service implementation
+│   ├── Configuration/              # Configuration options
+│   │   └── HelloWorldOptions.cs   # Application configuration
+│   └── Services/                   # DI extensions
+│       └── ServiceCollectionExtensions.cs
+├── HelloWorld.Demo/                # Demo console application
+│   ├── Program.cs                  # Entry point and demos
+│   └── appsettings.json           # Configuration
+├── HelloWorld.Tests/               # Unit tests
+│   ├── Implementations/
+│   │   ├── GreeterTests.cs
+│   │   └── MessageServiceTests.cs
+│   └── Services/
+│       └── ServiceCollectionExtensionsTests.cs
+└── build.ps1                      # Build script
 ```
 
-### Basic Usage
+## 🛠️ Getting Started
 
-```csharp
-using ListFile.Core.Interfaces;
-using ListFile.Core.Implementations;
-using Microsoft.Extensions.Options;
+### Prerequisites
 
-// Create a file reader with default options
-var options = Options.Create(new FileReaderOptions());
-IFileReader fileReader = new FileReader(options);
+- .NET 8.0 SDK or later
+- PowerShell (for build script)
 
-// Read the last 10 lines from a file
-IEnumerable<IFileLine> lines = await fileReader.ReadLastLinesAsync("myfile.txt");
+### Building the Project
 
-foreach (var line in lines)
-{
-    Console.WriteLine($"Line {line.LineNumber}: {line.Content}");
-}
+```bash
+# Using the build script (recommended)
+./build.ps1
+
+# Or manually
+dotnet build --configuration Release
 ```
 
-### Dependency Injection
+### Running Tests
+
+```bash
+dotnet test --configuration Release
+```
+
+### Running the Demo
+
+```bash
+dotnet run --project HelloWorld.Demo --configuration Release
+```
+
+## 💡 Usage
+
+### Basic Usage with Dependency Injection
 
 ```csharp
 using Microsoft.Extensions.DependencyInjection;
-using ListFile.Core.Services;
+using Microsoft.Extensions.Hosting;
+using HelloWorld.Core.Interfaces;
+using HelloWorld.Core.Services;
 
-var services = new ServiceCollection();
+var host = Host.CreateDefaultBuilder()
+    .ConfigureServices(services =>
+    {
+        services.AddHelloWorld(options =>
+        {
+            options.DefaultName = "World";
+            options.IncludeTimestamp = true;
+        });
+    })
+    .Build();
 
-// Register file reading services with custom options
-services.AddFileReading(options =>
-{
-    options.MaxFileSizeBytes = 100 * 1024 * 1024; // 100MB
-    options.SmallFileThresholdBytes = 1024 * 1024; // 1MB
-    options.EnablePerformanceLogging = true;
-});
+var greeter = host.Services.GetRequiredService<IGreeter>();
+var messageService = host.Services.GetRequiredService<IMessageService>();
 
-var serviceProvider = services.BuildServiceProvider();
-var fileReader = serviceProvider.GetRequiredService<IFileReader>();
-
-// Read last 5 lines
-var result = await fileReader.ReadLastLinesAsync("largefile.txt", 5);
+Console.WriteLine(greeter.GetGreeting());              // "Hello, World!"
+Console.WriteLine(greeter.GetGreeting("Alice"));       // "Hello, Alice!"
+Console.WriteLine(messageService.GetWelcomeMessage()); // "Welcome to the HelloWorld application!"
 ```
 
-## Configuration Options
+### Configuration
 
-The `FileReaderOptions` class provides several configuration options:
-
-```csharp
-public class FileReaderOptions
-{
-    // Maximum file size that can be processed (default: 100MB)
-    public long MaxFileSizeBytes { get; set; } = 100 * 1024 * 1024;
-    
-    // Threshold for small vs. large file processing (default: 1MB)
-    public long SmallFileThresholdBytes { get; set; } = 1024 * 1024;
-    
-    // Buffer size for reading large files (default: 4KB)
-    public int BufferSize { get; set; } = 4096;
-    
-    // Enable performance logging (default: false)
-    public bool EnablePerformanceLogging { get; set; } = false;
-    
-    // Default encoding for reading files (default: UTF-8)
-    public string DefaultEncoding { get; set; } = "UTF-8";
-}
-```
-
-## Performance Characteristics
-
-The library uses different strategies based on file size:
-
-- **Small Files** (≤ threshold): Reads all lines and returns the last N
-- **Large Files** (> threshold): Uses backward reading algorithm for efficiency
-
-### Benchmarks
-
-For a 10,000-line file (≈1MB):
-- Reading last 10 lines: ~5-15ms
-- Memory usage: Minimal (only stores requested lines)
-
-## API Reference
-
-### IFileReader Interface
-
-```csharp
-public interface IFileReader
-{
-    // Asynchronous method to read last N lines
-    Task<IEnumerable<IFileLine>> ReadLastLinesAsync(string filePath, int lineCount = 10);
-    
-    // Synchronous method to read last N lines  
-    IEnumerable<IFileLine> ReadLastLines(string filePath, int lineCount = 10);
-}
-```
-
-### IFileLine Interface
-
-```csharp
-public interface IFileLine
-{
-    int LineNumber { get; }    // 1-based line number
-    string Content { get; }    // Line content
-}
-```
-
-## Error Handling
-
-The library throws appropriate exceptions for various error conditions:
-
-- `ArgumentNullException`: When file path is null or empty
-- `ArgumentException`: When line count is less than 1 or file size exceeds limits
-- `FileNotFoundException`: When the specified file doesn't exist
-
-## Thread Safety
-
-The FileReader class is thread-safe and can be used concurrently from multiple threads. The implementation uses appropriate locking mechanisms to ensure data integrity.
-
-## Examples
-
-### Reading Different Numbers of Lines
-
-```csharp
-// Read last 5 lines
-var last5 = await fileReader.ReadLastLinesAsync("file.txt", 5);
-
-// Read last 20 lines  
-var last20 = await fileReader.ReadLastLinesAsync("file.txt", 20);
-
-// Default behavior (last 10 lines)
-var defaultLines = await fileReader.ReadLastLinesAsync("file.txt");
-```
-
-### Configuration from appsettings.json
+Configure through `appsettings.json`:
 
 ```json
 {
-  "FileReader": {
-    "MaxFileSizeBytes": 52428800,
-    "SmallFileThresholdBytes": 1048576,
-    "EnablePerformanceLogging": true,
-    "BufferSize": 8192
+  "HelloWorld": {
+    "DefaultName": "World",
+    "IncludeTimestamp": true,
+    "MessageFormat": "Hello, {0}!"
   }
 }
 ```
 
+Or through code:
+
 ```csharp
-services.AddFileReading(configuration);
+services.AddHelloWorld(options =>
+{
+    options.DefaultName = "Universe";
+    options.IncludeTimestamp = false;
+    options.MessageFormat = "Hi there, {0}!";
+});
 ```
 
-## Contributing
+## 🧪 Testing
 
-Contributions are welcome! Please ensure your code follows the established patterns:
+The project includes comprehensive unit tests covering:
 
-- Use async/await for all public APIs
-- Include comprehensive unit tests
-- Follow C# naming conventions
-- Add XML documentation for public APIs
-- Ensure thread safety
+- ✅ Greeter functionality with various input scenarios
+- ✅ Message service operations
+- ✅ Dependency injection configuration
+- ✅ Service lifetime management
 
-## License
+Run tests with:
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+```bash
+dotnet test --configuration Release --logger:trx --collect:"XPlat Code Coverage"
+```
 
-## Architecture
+## 🚀 Build & CI/CD
 
-The library follows clean architecture principles:
+The project includes:
 
-- **Interfaces**: Define contracts (`IFileReader`, `IFileLine`)
-- **Implementations**: Core logic (`FileReader`, `FileLine`)
-- **Configuration**: Options pattern (`FileReaderOptions`)
-- **Services**: Dependency injection extensions (`ServiceCollectionExtensions`)
+- **PowerShell build script** (`build.ps1`) for automated builds
+- **GitHub Actions workflow** for continuous integration
+- **Multi-platform support** (Windows, Linux, macOS)
 
-Built with .NET 8 and modern C# features including nullable reference types and performance optimizations. 
+## 📋 Features Demonstrated
+
+This project demonstrates several important software engineering practices:
+
+- **Clean Architecture**: Clear separation between interfaces and implementations
+- **Dependency Injection**: Proper use of Microsoft.Extensions.DependencyInjection
+- **Configuration Pattern**: Options pattern for configuration management
+- **Unit Testing**: Comprehensive test coverage with xUnit
+- **Documentation**: XML documentation comments for all public APIs
+- **Build Automation**: Automated build and test pipeline
+
+## 🤝 Contributing
+
+This is a template project designed for pair programming and learning. Feel free to:
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add/update tests
+5. Submit a pull request
+
+## 📄 License
+
+This project is provided as-is for educational and demonstration purposes. 
