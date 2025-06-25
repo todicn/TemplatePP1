@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\MergeIntervals.Core\MergeIntervals.Core.csproj" />
+    <ProjectReference Include="..\HelloWorld.Core\HelloWorld.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

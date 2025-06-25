@@ -8,7 +8,7 @@ on:
 
 env:
   DOTNET_VERSION: '8.0.x'
-  SOLUTION_PATH: 'MergeIntervalsPP1.sln'
+  SOLUTION_PATH: 'HelloWorldPP1.sln'
 
 jobs:
   build-and-test:
@@ -107,7 +107,7 @@ jobs:
       
     - name: Run performance tests
       run: |
-        cd MergeIntervals.Demo
+        cd HelloWorld.Demo
         timeout 30s dotnet run --configuration Release || true
         echo "Performance test completed"
 

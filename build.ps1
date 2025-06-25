@@ -39,7 +39,7 @@ if ($LASTEXITCODE -ne 0) {
 # Run demo
 Write-Host "Running demo application..." -ForegroundColor Yellow
 Write-Host "Press Ctrl+C to skip demo or any key in demo to continue..." -ForegroundColor Gray
-dotnet run --project MergeIntervals.Demo --configuration Release --no-build
+dotnet run --project HelloWorld.Demo --configuration Release --no-build
 
 Write-Host ""
 Write-Host "=== Build Completed Successfully ===" -ForegroundColor Green
