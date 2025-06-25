@@ -1,30 +1,31 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using MergeIntervals.Core.Implementations;
-using MergeIntervals.Core.Interfaces;
-using MergeIntervals.Core.Services;
+using ListFile.Core.Implementations;
+using ListFile.Core.Interfaces;
+using ListFile.Core.Services;
 
-namespace MergeIntervals.Demo;
+namespace ListFile.Demo;
 
 /// <summary>
-/// Demo application showcasing the interval merging functionality.
+/// Demo application showcasing the file reading functionality.
 /// </summary>
 class Program
 {
     static async Task Main(string[] args)
     {
-        Console.WriteLine("=== MergeIntervals Demo Application ===");
+        Console.WriteLine("=== ListFile Demo Application ===");
         Console.WriteLine();
 
         // Setup dependency injection
         IHost host = Host.CreateDefaultBuilder(args)
             .ConfigureServices((context, services) =>
             {
-                services.AddIntervalMerging(options =>
+                services.AddFileReading(options =>
                 {
                     options.EnablePerformanceLogging = true;
-                    options.MaxIntervals = 10000;
+                    options.MaxFileSizeBytes = 50 * 1024 * 1024; // 50MB
+                    options.SmallFileThresholdBytes = 512 * 1024; // 512KB
                 });
                 services.AddLogging(builder => builder.AddConsole());
             })
@@ -32,23 +33,26 @@ class Program
 
         IServiceProvider serviceProvider = host.Services;
         ILogger<Program> logger = serviceProvider.GetRequiredService<ILogger<Program>>();
-        IIntervalMerger intervalMerger = serviceProvider.GetRequiredService<IIntervalMerger>();
+        IFileReader fileReader = serviceProvider.GetRequiredService<IFileReader>();
 
         try
         {
-            logger.LogInformation("Starting interval merging demonstrations");
+            logger.LogInformation("Starting file reading demonstrations");
 
-            // Demo 1: Basic example from requirements
-            await DemoRequirementExample(intervalMerger);
+            // Create sample files for demonstration
+            await CreateSampleFiles();
 
-            // Demo 2: Various test cases
-            await DemoVariousTestCases(intervalMerger);
+            // Demo 1: Basic file reading
+            await DemoBasicFileReading(fileReader);
+
+            // Demo 2: Different line counts
+            await DemoDifferentLineCounts(fileReader);
 
             // Demo 3: Edge cases
-            await DemoEdgeCases(intervalMerger);
+            await DemoEdgeCases(fileReader);
 
-            // Demo 4: Performance test
-            await DemoPerformanceTest(intervalMerger);
+            // Demo 4: Large file performance
+            await DemoLargeFilePerformance(fileReader);
 
             logger.LogInformation("All demonstrations completed successfully");
         }
@@ -57,6 +61,11 @@ class Program
             logger.LogError(ex, "An error occurred during demonstration");
             Console.WriteLine($"Error: {ex.Message}");
         }
+        finally
+        {
+            // Cleanup sample files
+            CleanupSampleFiles();
+        }
 
         Console.WriteLine();
         Console.WriteLine("Press any key to exit...");
@@ -64,150 +73,218 @@ class Program
     }
 
     /// <summary>
-    /// Demonstrates the basic example from the requirements.
+    /// Creates sample files for demonstration purposes.
     /// </summary>
-    private static async Task DemoRequirementExample(IIntervalMerger intervalMerger)
+    private static async Task CreateSampleFiles()
     {
-        Console.WriteLine("=== Demo 1: Basic Requirement Example ===");
-        Console.WriteLine("Input: [[1, 4], [2, 6], [8, 10], [15, 18]]");
-        Console.WriteLine("Expected: [[1, 6], [8, 10], [15, 18]]");
+        Console.WriteLine("Creating sample files for demonstration...");
 
-        List<IInterval> intervals = new()
+        // Create a small sample file
+        var smallFileContent = new List<string>();
+        for (int i = 1; i <= 20; i++)
         {
-            new Interval(1, 4),
-            new Interval(2, 6),
-            new Interval(8, 10),
-            new Interval(15, 18)
-        };
+            smallFileContent.Add($"This is line {i} of the small sample file.");
+        }
+        await File.WriteAllLinesAsync("sample_small.txt", smallFileContent);
 
-        IEnumerable<IInterval> result = await intervalMerger.MergeAsync(intervals);
-        
-        Console.WriteLine($"Result: {FormatIntervals(result)}");
+        // Create a medium sample file
+        var mediumFileContent = new List<string>();
+        for (int i = 1; i <= 100; i++)
+        {
+            mediumFileContent.Add($"Line {i}: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.");
+        }
+        await File.WriteAllLinesAsync("sample_medium.txt", mediumFileContent);
+
+        // Create a large sample file
+        var largeFileContent = new List<string>();
+        for (int i = 1; i <= 10000; i++)
+        {
+            largeFileContent.Add($"Line {i}: This is a large file with many lines to test performance and large file handling capabilities.");
+        }
+        await File.WriteAllLinesAsync("sample_large.txt", largeFileContent);
+
+        Console.WriteLine("Sample files created successfully.");
         Console.WriteLine();
     }
 
     /// <summary>
-    /// Demonstrates various test cases.
+    /// Demonstrates basic file reading functionality.
     /// </summary>
-    private static async Task DemoVariousTestCases(IIntervalMerger intervalMerger)
+    private static async Task DemoBasicFileReading(IFileReader fileReader)
     {
-        Console.WriteLine("=== Demo 2: Various Test Cases ===");
+        Console.WriteLine("=== Demo 1: Basic File Reading ===");
+        Console.WriteLine("Reading the last 10 lines from sample_small.txt:");
 
-        // Test Case 1: No overlapping intervals
-        Console.WriteLine("Test Case 1 - No overlapping intervals:");
-        Console.WriteLine("Input: [[1, 2], [3, 5], [6, 7]]");
-        List<IInterval> intervals1 = new()
+        try
         {
-            new Interval(1, 2),
-            new Interval(3, 5),
-            new Interval(6, 7)
-        };
-        IEnumerable<IInterval> result1 = intervalMerger.Merge(intervals1);
-        Console.WriteLine($"Result: {FormatIntervals(result1)}");
+            IEnumerable<IFileLine> lines = await fileReader.ReadLastLinesAsync("sample_small.txt");
+            
+            foreach (var line in lines)
+            {
+                Console.WriteLine($"  {line}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+
+        Console.WriteLine();
+    }
+
+    /// <summary>
+    /// Demonstrates reading different numbers of lines.
+    /// </summary>
+    private static async Task DemoDifferentLineCounts(IFileReader fileReader)
+    {
+        Console.WriteLine("=== Demo 2: Different Line Counts ===");
+
+        // Read last 5 lines
+        Console.WriteLine("Reading the last 5 lines from sample_medium.txt:");
+        try
+        {
+            IEnumerable<IFileLine> lines5 = fileReader.ReadLastLines("sample_medium.txt", 5);
+            
+            foreach (var line in lines5)
+            {
+                Console.WriteLine($"  {line.LineNumber}: {line.Content[..Math.Min(50, line.Content.Length)]}...");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+
         Console.WriteLine();
 
-        // Test Case 2: All intervals overlap
-        Console.WriteLine("Test Case 2 - All intervals overlap:");
-        Console.WriteLine("Input: [[1, 4], [2, 5], [3, 6]]");
-        List<IInterval> intervals2 = new()
+        // Read last 15 lines
+        Console.WriteLine("Reading the last 15 lines from sample_medium.txt:");
+        try
         {
-            new Interval(1, 4),
-            new Interval(2, 5),
-            new Interval(3, 6)
-        };
-        IEnumerable<IInterval> result2 = await intervalMerger.MergeAsync(intervals2);
-        Console.WriteLine($"Result: {FormatIntervals(result2)}");
-        Console.WriteLine();
+            IEnumerable<IFileLine> lines15 = await fileReader.ReadLastLinesAsync("sample_medium.txt", 15);
+            
+            foreach (var line in lines15)
+            {
+                Console.WriteLine($"  {line.LineNumber}: {line.Content[..Math.Min(50, line.Content.Length)]}...");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
 
-        // Test Case 3: Touching intervals
-        Console.WriteLine("Test Case 3 - Touching intervals:");
-        Console.WriteLine("Input: [[1, 4], [4, 5], [6, 8]]");
-        List<IInterval> intervals3 = new()
-        {
-            new Interval(1, 4),
-            new Interval(4, 5),
-            new Interval(6, 8)
-        };
-        IEnumerable<IInterval> result3 = intervalMerger.Merge(intervals3);
-        Console.WriteLine($"Result: {FormatIntervals(result3)}");
         Console.WriteLine();
     }
 
     /// <summary>
     /// Demonstrates edge cases.
     /// </summary>
-    private static async Task DemoEdgeCases(IIntervalMerger intervalMerger)
+    private static async Task DemoEdgeCases(IFileReader fileReader)
     {
         Console.WriteLine("=== Demo 3: Edge Cases ===");
 
-        // Edge Case 1: Empty list
-        Console.WriteLine("Edge Case 1 - Empty list:");
-        List<IInterval> emptyIntervals = new();
-        IEnumerable<IInterval> emptyResult = await intervalMerger.MergeAsync(emptyIntervals);
-        Console.WriteLine($"Result: {FormatIntervals(emptyResult)}");
-        Console.WriteLine();
-
-        // Edge Case 2: Single interval
-        Console.WriteLine("Edge Case 2 - Single interval:");
-        Console.WriteLine("Input: [[5, 10]]");
-        List<IInterval> singleInterval = new() { new Interval(5, 10) };
-        IEnumerable<IInterval> singleResult = intervalMerger.Merge(singleInterval);
-        Console.WriteLine($"Result: {FormatIntervals(singleResult)}");
-        Console.WriteLine();
-
-        // Edge Case 3: Negative numbers
-        Console.WriteLine("Edge Case 3 - Negative numbers:");
-        Console.WriteLine("Input: [[-5, -1], [-3, 2], [0, 5]]");
-        List<IInterval> negativeIntervals = new()
-        {
-            new Interval(-5, -1),
-            new Interval(-3, 2),
-            new Interval(0, 5)
-        };
-        IEnumerable<IInterval> negativeResult = await intervalMerger.MergeAsync(negativeIntervals);
-        Console.WriteLine($"Result: {FormatIntervals(negativeResult)}");
-        Console.WriteLine();
-    }
-
-    /// <summary>
-    /// Demonstrates performance with a larger dataset.
-    /// </summary>
-    private static async Task DemoPerformanceTest(IIntervalMerger intervalMerger)
-    {
-        Console.WriteLine("=== Demo 4: Performance Test ===");
-        Console.WriteLine("Generating 1000 random intervals...");
-
-        Random random = new(42); // Fixed seed for reproducible results
-        List<IInterval> largeIntervals = new();
-
-        for (int i = 0; i < 1000; i++)
-        {
-            int start = random.Next(0, 10000);
-            int end = start + random.Next(1, 100);
-            largeIntervals.Add(new Interval(start, end));
-        }
-
-        Console.WriteLine($"Generated {largeIntervals.Count} intervals");
+        // Create an empty file
+        await File.WriteAllTextAsync("empty.txt", "");
         
-        System.Diagnostics.Stopwatch stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        IEnumerable<IInterval> result = await intervalMerger.MergeAsync(largeIntervals);
-        stopwatch.Stop();
+        Console.WriteLine("Edge Case 1 - Empty file:");
+        try
+        {
+            IEnumerable<IFileLine> emptyResult = await fileReader.ReadLastLinesAsync("empty.txt");
+            Console.WriteLine($"  Result: {emptyResult.Count()} lines");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  Error: {ex.Message}");
+        }
 
-        Console.WriteLine($"Merged into {result.Count()} intervals");
-        Console.WriteLine($"Processing time: {stopwatch.ElapsedMilliseconds}ms");
+        // Create a single line file
+        await File.WriteAllTextAsync("single_line.txt", "This is the only line in this file.");
+        
+        Console.WriteLine("Edge Case 2 - Single line file:");
+        try
+        {
+            IEnumerable<IFileLine> singleResult = fileReader.ReadLastLines("single_line.txt", 10);
+            foreach (var line in singleResult)
+            {
+                Console.WriteLine($"  {line}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  Error: {ex.Message}");
+        }
+
+        // Test with non-existent file
+        Console.WriteLine("Edge Case 3 - Non-existent file:");
+        try
+        {
+            IEnumerable<IFileLine> nonExistentResult = await fileReader.ReadLastLinesAsync("non_existent.txt");
+            Console.WriteLine($"  Result: {nonExistentResult.Count()} lines");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  Error: {ex.Message}");
+        }
+
         Console.WriteLine();
     }
 
     /// <summary>
-    /// Formats a collection of intervals for display.
+    /// Demonstrates performance with a large file.
     /// </summary>
-    private static string FormatIntervals(IEnumerable<IInterval> intervals)
+    private static async Task DemoLargeFilePerformance(IFileReader fileReader)
     {
-        if (!intervals.Any())
+        Console.WriteLine("=== Demo 4: Large File Performance ===");
+        Console.WriteLine("Reading the last 10 lines from sample_large.txt (10,000 lines):");
+
+        try
         {
-            return "[]";
+            System.Diagnostics.Stopwatch stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            IEnumerable<IFileLine> lines = await fileReader.ReadLastLinesAsync("sample_large.txt");
+            stopwatch.Stop();
+
+            Console.WriteLine($"Performance: {stopwatch.ElapsedMilliseconds}ms");
+            Console.WriteLine("Last 10 lines:");
+            
+            foreach (var line in lines)
+            {
+                Console.WriteLine($"  {line.LineNumber}: {line.Content[..Math.Min(60, line.Content.Length)]}...");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
         }
 
-        return "[" + string.Join(", ", intervals.Select(i => i.ToString())) + "]";
+        Console.WriteLine();
+    }
+
+    /// <summary>
+    /// Cleans up the sample files created for demonstration.
+    /// </summary>
+    private static void CleanupSampleFiles()
+    {
+        string[] filesToDelete = {
+            "sample_small.txt",
+            "sample_medium.txt", 
+            "sample_large.txt",
+            "empty.txt",
+            "single_line.txt"
+        };
+
+        foreach (string file in filesToDelete)
+        {
+            try
+            {
+                if (File.Exists(file))
+                {
+                    File.Delete(file);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Warning: Could not delete {file}: {ex.Message}");
+            }
+        }
     }
 }

@@ -1,64 +1,67 @@
-using MergeIntervals.Core.Interfaces;
+using ListFile.Core.Interfaces;
 
-namespace MergeIntervals.Core.Implementations;
+namespace ListFile.Core.Implementations;
 
 /// <summary>
-/// Represents an interval with a start and end point.
+/// Represents a line from a file with its line number and content.
 /// </summary>
-public class Interval : IInterval
+public class FileLine : IFileLine
 {
     /// <summary>
-    /// Initializes a new instance of the <see cref="Interval"/> class.
+    /// Initializes a new instance of the <see cref="FileLine"/> class.
     /// </summary>
-    /// <param name="start">The start point of the interval.</param>
-    /// <param name="end">The end point of the interval.</param>
-    /// <exception cref="ArgumentException">Thrown when start is greater than end.</exception>
-    public Interval(int start, int end)
+    /// <param name="lineNumber">The line number (1-based indexing).</param>
+    /// <param name="content">The content of the line.</param>
+    /// <exception cref="ArgumentException">Thrown when lineNumber is less than 1.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when content is null.</exception>
+    public FileLine(int lineNumber, string content)
     {
-        if (start > end)
+        if (lineNumber < 1)
         {
-            throw new ArgumentException("Start cannot be greater than end.", nameof(start));
+            throw new ArgumentException("Line number must be greater than 0.", nameof(lineNumber));
         }
 
-        Start = start;
-        End = end;
+        LineNumber = lineNumber;
+        Content = content ?? throw new ArgumentNullException(nameof(content));
     }
 
     /// <summary>
-    /// Gets the start point of the interval.
+    /// Gets the line number (1-based indexing).
     /// </summary>
-    public int Start { get; }
+    public int LineNumber { get; }
 
     /// <summary>
-    /// Gets the end point of the interval.
+    /// Gets the content of the line.
     /// </summary>
-    public int End { get; }
+    public string Content { get; }
 
     /// <summary>
-    /// Returns a string representation of the interval.
+    /// Returns a string representation of the file line.
     /// </summary>
-    /// <returns>A string representation of the interval in the format [start, end].</returns>
+    /// <returns>A string representation of the file line in the format "LineNumber: Content".</returns>
     public override string ToString()
     {
-        return $"[{Start}, {End}]";
+        return $"{LineNumber}: {Content}";
     }
 
     /// <summary>
-    /// Determines whether the specified object is equal to the current interval.
+    /// Determines whether the specified object is equal to the current file line.
     /// </summary>
-    /// <param name="obj">The object to compare with the current interval.</param>
-    /// <returns>true if the specified object is equal to the current interval; otherwise, false.</returns>
+    /// <param name="obj">The object to compare with the current file line.</param>
+    /// <returns>true if the specified object is equal to the current file line; otherwise, false.</returns>
     public override bool Equals(object? obj)
     {
-        return obj is Interval interval && Start == interval.Start && End == interval.End;
+        return obj is FileLine fileLine && 
+               LineNumber == fileLine.LineNumber && 
+               Content == fileLine.Content;
     }
 
     /// <summary>
     /// Serves as the default hash function.
     /// </summary>
-    /// <returns>A hash code for the current interval.</returns>
+    /// <returns>A hash code for the current file line.</returns>
     public override int GetHashCode()
     {
-        return HashCode.Combine(Start, End);
+        return HashCode.Combine(LineNumber, Content);
     }
 } 

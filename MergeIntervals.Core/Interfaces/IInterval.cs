@@ -1,17 +1,17 @@
-namespace MergeIntervals.Core.Interfaces;
+namespace ListFile.Core.Interfaces;
 
 /// <summary>
-/// Represents an interval with a start and end point.
+/// Represents a line from a file with its line number and content.
 /// </summary>
-public interface IInterval
+public interface IFileLine
 {
     /// <summary>
-    /// Gets the start point of the interval.
+    /// Gets the line number (1-based indexing).
     /// </summary>
-    int Start { get; }
+    int LineNumber { get; }
 
     /// <summary>
-    /// Gets the end point of the interval.
+    /// Gets the content of the line.
     /// </summary>
-    int End { get; }
+    string Content { get; }
 } 

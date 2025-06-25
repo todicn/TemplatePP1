@@ -1,85 +1,61 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using MergeIntervals.Core.Configuration;
-using MergeIntervals.Core.Implementations;
-using MergeIntervals.Core.Interfaces;
+using ListFile.Core.Configuration;
+using ListFile.Core.Interfaces;
+using ListFile.Core.Implementations;
 
-namespace MergeIntervals.Core.Services;
+namespace ListFile.Core.Services;
 
 /// <summary>
-/// Extension methods for configuring services in the dependency injection container.
+/// Extension methods for configuring file reading services in the dependency injection container.
 /// </summary>
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Adds interval merging services to the dependency injection container.
+    /// Adds file reading services to the specified <see cref="IServiceCollection"/>.
     /// </summary>
-    /// <param name="services">The service collection to add services to.</param>
-    /// <param name="configuration">The configuration instance to bind options from.</param>
-    /// <returns>The service collection for method chaining.</returns>
-    /// <exception cref="ArgumentNullException">Thrown when services or configuration is null.</exception>
-    public static IServiceCollection AddIntervalMerging(this IServiceCollection services, IConfiguration configuration)
+    /// <param name="services">The <see cref="IServiceCollection"/> to add services to.</param>
+    /// <param name="configureOptions">An optional action to configure the file reader options.</param>
+    /// <returns>The <see cref="IServiceCollection"/> so that additional calls can be chained.</returns>
+    public static IServiceCollection AddFileReading(
+        this IServiceCollection services,
+        Action<FileReaderOptions>? configureOptions = null)
     {
-        if (services == null)
-        {
-            throw new ArgumentNullException(nameof(services));
-        }
-
-        if (configuration == null)
-        {
-            throw new ArgumentNullException(nameof(configuration));
-        }
-
         // Configure options
-        services.Configure<IntervalMergerOptions>(configuration.GetSection(IntervalMergerOptions.SectionName));
+        if (configureOptions != null)
+        {
+            services.Configure(configureOptions);
+        }
+        else
+        {
+            // Use default options
+            services.Configure<FileReaderOptions>(options => { });
+        }
 
-        // Register services
-        services.AddSingleton<IIntervalMerger, IntervalMerger>();
+        // Register the file reader service
+        services.AddScoped<IFileReader, FileReader>();
 
         return services;
     }
 
     /// <summary>
-    /// Adds interval merging services to the dependency injection container with custom options.
+    /// Adds file reading services to the specified <see cref="IServiceCollection"/> with configuration binding.
     /// </summary>
-    /// <param name="services">The service collection to add services to.</param>
-    /// <param name="configureOptions">An action to configure the interval merger options.</param>
-    /// <returns>The service collection for method chaining.</returns>
-    /// <exception cref="ArgumentNullException">Thrown when services or configureOptions is null.</exception>
-    public static IServiceCollection AddIntervalMerging(this IServiceCollection services, Action<IntervalMergerOptions> configureOptions)
+    /// <param name="services">The <see cref="IServiceCollection"/> to add services to.</param>
+    /// <param name="configuration">The configuration instance to bind to.</param>
+    /// <param name="sectionName">The configuration section name. Defaults to "FileReader".</param>
+    /// <returns>The <see cref="IServiceCollection"/> so that additional calls can be chained.</returns>
+    public static IServiceCollection AddFileReading(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        string sectionName = FileReaderOptions.SectionName)
     {
-        if (services == null)
-        {
-            throw new ArgumentNullException(nameof(services));
-        }
+        // Bind configuration
+        services.Configure<FileReaderOptions>(configuration.GetSection(sectionName));
 
-        if (configureOptions == null)
-        {
-            throw new ArgumentNullException(nameof(configureOptions));
-        }
-
-        // Configure options
-        services.Configure(configureOptions);
-
-        // Register services
-        services.AddSingleton<IIntervalMerger, IntervalMerger>();
+        // Register the file reader service
+        services.AddScoped<IFileReader, FileReader>();
 
         return services;
-    }
-
-    /// <summary>
-    /// Adds interval merging services to the dependency injection container with default options.
-    /// </summary>
-    /// <param name="services">The service collection to add services to.</param>
-    /// <returns>The service collection for method chaining.</returns>
-    /// <exception cref="ArgumentNullException">Thrown when services is null.</exception>
-    public static IServiceCollection AddIntervalMerging(this IServiceCollection services)
-    {
-        if (services == null)
-        {
-            throw new ArgumentNullException(nameof(services));
-        }
-
-        return services.AddIntervalMerging(_ => { });
     }
 } 

@@ -1,147 +1,149 @@
-using FluentAssertions;
-using MergeIntervals.Core.Implementations;
+using ListFile.Core.Implementations;
+using Xunit;
 
-namespace MergeIntervals.Tests.Implementations;
+namespace ListFile.Tests.Implementations;
 
 /// <summary>
-/// Unit tests for the <see cref="Interval"/> class.
+/// Tests for the FileLine class.
 /// </summary>
-public class IntervalTests
+public class FileLineTests
 {
     [Fact]
-    public void Constructor_ValidInterval_SetsPropertiesCorrectly()
+    public void Constructor_ValidParameters_CreatesFileLine()
     {
         // Arrange
-        const int start = 1;
-        const int end = 4;
+        int lineNumber = 5;
+        string content = "This is a test line";
 
         // Act
-        Interval interval = new(start, end);
+        var fileLine = new FileLine(lineNumber, content);
 
         // Assert
-        interval.Start.Should().Be(start);
-        interval.End.Should().Be(end);
+        Assert.Equal(lineNumber, fileLine.LineNumber);
+        Assert.Equal(content, fileLine.Content);
     }
 
     [Fact]
-    public void Constructor_StartEqualsEnd_SetsPropertiesCorrectly()
+    public void Constructor_LineNumberLessThanOne_ThrowsArgumentException()
     {
         // Arrange
-        const int start = 5;
-        const int end = 5;
+        int lineNumber = 0;
+        string content = "Test content";
+
+        // Act & Assert
+        Assert.Throws<ArgumentException>(() => new FileLine(lineNumber, content));
+    }
+
+    [Fact]
+    public void Constructor_NullContent_ThrowsArgumentNullException()
+    {
+        // Arrange
+        int lineNumber = 1;
+        string? content = null;
+
+        // Act & Assert
+        Assert.Throws<ArgumentNullException>(() => new FileLine(lineNumber, content!));
+    }
+
+    [Fact]
+    public void ToString_ValidFileLine_ReturnsCorrectFormat()
+    {
+        // Arrange
+        var fileLine = new FileLine(10, "Sample line content");
+        var expected = "10: Sample line content";
 
         // Act
-        Interval interval = new(start, end);
+        var result = fileLine.ToString();
 
         // Assert
-        interval.Start.Should().Be(start);
-        interval.End.Should().Be(end);
+        Assert.Equal(expected, result);
     }
 
     [Fact]
-    public void Constructor_StartGreaterThanEnd_ThrowsArgumentException()
+    public void Equals_SameLineNumberAndContent_ReturnsTrue()
     {
         // Arrange
-        const int start = 10;
-        const int end = 5;
-
-        // Act & Assert
-        Action act = () => new Interval(start, end);
-        act.Should().Throw<ArgumentException>()
-           .WithMessage("Start cannot be greater than end. (Parameter 'start')");
-    }
-
-    [Fact]
-    public void ToString_ReturnsCorrectFormat()
-    {
-        // Arrange
-        Interval interval = new(1, 4);
+        var fileLine1 = new FileLine(5, "Test content");
+        var fileLine2 = new FileLine(5, "Test content");
 
         // Act
-        string result = interval.ToString();
+        var result = fileLine1.Equals(fileLine2);
 
         // Assert
-        result.Should().Be("[1, 4]");
+        Assert.True(result);
     }
 
     [Fact]
-    public void Equals_SameIntervals_ReturnsTrue()
+    public void Equals_DifferentLineNumber_ReturnsFalse()
     {
         // Arrange
-        Interval interval1 = new(1, 4);
-        Interval interval2 = new(1, 4);
+        var fileLine1 = new FileLine(5, "Test content");
+        var fileLine2 = new FileLine(6, "Test content");
 
-        // Act & Assert
-        interval1.Equals(interval2).Should().BeTrue();
-        interval1.Equals((object)interval2).Should().BeTrue();
+        // Act
+        var result = fileLine1.Equals(fileLine2);
+
+        // Assert
+        Assert.False(result);
     }
 
     [Fact]
-    public void Equals_DifferentIntervals_ReturnsFalse()
+    public void Equals_DifferentContent_ReturnsFalse()
     {
         // Arrange
-        Interval interval1 = new(1, 4);
-        Interval interval2 = new(2, 6);
+        var fileLine1 = new FileLine(5, "Test content 1");
+        var fileLine2 = new FileLine(5, "Test content 2");
 
-        // Act & Assert
-        interval1.Equals(interval2).Should().BeFalse();
-        interval1.Equals((object)interval2).Should().BeFalse();
+        // Act
+        var result = fileLine1.Equals(fileLine2);
+
+        // Assert
+        Assert.False(result);
     }
 
     [Fact]
     public void Equals_NullObject_ReturnsFalse()
     {
         // Arrange
-        Interval interval = new(1, 4);
+        var fileLine = new FileLine(5, "Test content");
 
-        // Act & Assert
-        interval.Equals(null).Should().BeFalse();
-    }
-
-    [Fact]
-    public void Equals_DifferentType_ReturnsFalse()
-    {
-        // Arrange
-        Interval interval = new(1, 4);
-        string notAnInterval = "not an interval";
-
-        // Act & Assert
-        interval.Equals(notAnInterval).Should().BeFalse();
-    }
-
-    [Fact]
-    public void GetHashCode_SameIntervals_ReturnsSameHashCode()
-    {
-        // Arrange
-        Interval interval1 = new(1, 4);
-        Interval interval2 = new(1, 4);
-
-        // Act & Assert
-        interval1.GetHashCode().Should().Be(interval2.GetHashCode());
-    }
-
-    [Fact]
-    public void GetHashCode_DifferentIntervals_ReturnsDifferentHashCodes()
-    {
-        // Arrange
-        Interval interval1 = new(1, 4);
-        Interval interval2 = new(2, 6);
-
-        // Act & Assert
-        interval1.GetHashCode().Should().NotBe(interval2.GetHashCode());
-    }
-
-    [Theory]
-    [InlineData(int.MinValue, int.MaxValue)]
-    [InlineData(-1000, 1000)]
-    [InlineData(0, 0)]
-    public void Constructor_EdgeCases_WorksCorrectly(int start, int end)
-    {
         // Act
-        Interval interval = new(start, end);
+        var result = fileLine.Equals(null);
 
         // Assert
-        interval.Start.Should().Be(start);
-        interval.End.Should().Be(end);
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void GetHashCode_SameLineNumberAndContent_ReturnsSameHashCode()
+    {
+        // Arrange
+        var fileLine1 = new FileLine(5, "Test content");
+        var fileLine2 = new FileLine(5, "Test content");
+
+        // Act
+        var hashCode1 = fileLine1.GetHashCode();
+        var hashCode2 = fileLine2.GetHashCode();
+
+        // Assert
+        Assert.Equal(hashCode1, hashCode2);
+    }
+
+    [Fact]
+    public void GetHashCode_DifferentLineNumberOrContent_ReturnsDifferentHashCode()
+    {
+        // Arrange
+        var fileLine1 = new FileLine(5, "Test content");
+        var fileLine2 = new FileLine(6, "Test content");
+        var fileLine3 = new FileLine(5, "Different content");
+
+        // Act
+        var hashCode1 = fileLine1.GetHashCode();
+        var hashCode2 = fileLine2.GetHashCode();
+        var hashCode3 = fileLine3.GetHashCode();
+
+        // Assert
+        Assert.NotEqual(hashCode1, hashCode2);
+        Assert.NotEqual(hashCode1, hashCode3);
     }
 } 

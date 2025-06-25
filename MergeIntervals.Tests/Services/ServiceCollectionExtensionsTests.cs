@@ -1,151 +1,158 @@
-using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using MergeIntervals.Core.Configuration;
-using MergeIntervals.Core.Interfaces;
-using MergeIntervals.Core.Services;
+using ListFile.Core.Configuration;
+using ListFile.Core.Interfaces;
+using ListFile.Core.Services;
+using Xunit;
 
-namespace MergeIntervals.Tests.Services;
+namespace ListFile.Tests.Services;
 
 /// <summary>
-/// Unit tests for the <see cref="ServiceCollectionExtensions"/> class.
+/// Tests for the ServiceCollectionExtensions class.
 /// </summary>
 public class ServiceCollectionExtensionsTests
 {
     [Fact]
-    public void AddIntervalMerging_WithConfiguration_RegistersServicesCorrectly()
+    public void AddFileReading_WithoutOptions_RegistersServices()
     {
         // Arrange
-        IServiceCollection services = new ServiceCollection();
-        IConfiguration configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                {"IntervalMerger:EnablePerformanceLogging", "true"},
-                {"IntervalMerger:MaxIntervals", "5000"}
-            })
+        var services = new ServiceCollection();
+
+        // Act
+        services.AddFileReading();
+        var serviceProvider = services.BuildServiceProvider();
+
+        // Assert
+        var fileReader = serviceProvider.GetService<IFileReader>();
+        Assert.NotNull(fileReader);
+        
+        var options = serviceProvider.GetService<IOptions<FileReaderOptions>>();
+        Assert.NotNull(options);
+        Assert.NotNull(options.Value);
+    }
+
+    [Fact]
+    public void AddFileReading_WithOptionsConfiguration_ConfiguresOptions()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        var expectedMaxFileSize = 5 * 1024 * 1024L; // 5MB
+        var expectedThreshold = 512 * 1024L; // 512KB
+
+        // Act
+        services.AddFileReading(options =>
+        {
+            options.MaxFileSizeBytes = expectedMaxFileSize;
+            options.SmallFileThresholdBytes = expectedThreshold;
+            options.EnablePerformanceLogging = true;
+        });
+        var serviceProvider = services.BuildServiceProvider();
+
+        // Assert
+        var options = serviceProvider.GetRequiredService<IOptions<FileReaderOptions>>();
+        Assert.Equal(expectedMaxFileSize, options.Value.MaxFileSizeBytes);
+        Assert.Equal(expectedThreshold, options.Value.SmallFileThresholdBytes);
+        Assert.True(options.Value.EnablePerformanceLogging);
+    }
+
+    [Fact]
+    public void AddFileReading_WithConfiguration_BindsFromConfiguration()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        var configurationData = new Dictionary<string, string?>
+        {
+            ["FileReader:MaxFileSizeBytes"] = "10485760", // 10MB
+            ["FileReader:SmallFileThresholdBytes"] = "1048576", // 1MB
+            ["FileReader:EnablePerformanceLogging"] = "true",
+            ["FileReader:BufferSize"] = "8192"
+        };
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(configurationData)
             .Build();
 
         // Act
-        services.AddIntervalMerging(configuration);
+        services.AddFileReading(configuration);
+        var serviceProvider = services.BuildServiceProvider();
 
         // Assert
-        ServiceProvider provider = services.BuildServiceProvider();
-        IIntervalMerger merger = provider.GetRequiredService<IIntervalMerger>();
-        merger.Should().NotBeNull();
-
-        IOptions<IntervalMergerOptions> options = provider.GetRequiredService<IOptions<IntervalMergerOptions>>();
-        options.Value.EnablePerformanceLogging.Should().BeTrue();
-        options.Value.MaxIntervals.Should().Be(5000);
+        var options = serviceProvider.GetRequiredService<IOptions<FileReaderOptions>>();
+        Assert.Equal(10485760L, options.Value.MaxFileSizeBytes);
+        Assert.Equal(1048576L, options.Value.SmallFileThresholdBytes);
+        Assert.True(options.Value.EnablePerformanceLogging);
+        Assert.Equal(8192, options.Value.BufferSize);
     }
 
     [Fact]
-    public void AddIntervalMerging_WithNullServices_ThrowsArgumentNullException()
+    public void AddFileReading_WithCustomSectionName_BindsFromCustomSection()
     {
         // Arrange
-        IServiceCollection? services = null;
-        IConfiguration configuration = new ConfigurationBuilder().Build();
-
-        // Act & Assert
-        Action act = () => services!.AddIntervalMerging(configuration);
-        act.Should().Throw<ArgumentNullException>()
-           .WithParameterName("services");
-    }
-
-    [Fact]
-    public void AddIntervalMerging_WithNullConfiguration_ThrowsArgumentNullException()
-    {
-        // Arrange
-        IServiceCollection services = new ServiceCollection();
-        IConfiguration? configuration = null;
-
-        // Act & Assert
-        Action act = () => services.AddIntervalMerging(configuration!);
-        act.Should().Throw<ArgumentNullException>()
-           .WithParameterName("configuration");
-    }
-
-    [Fact]
-    public void AddIntervalMerging_WithCustomOptions_RegistersServicesCorrectly()
-    {
-        // Arrange
-        IServiceCollection services = new ServiceCollection();
-
-        // Act
-        services.AddIntervalMerging(options =>
+        var services = new ServiceCollection();
+        var configurationData = new Dictionary<string, string?>
         {
-            options.EnablePerformanceLogging = true;
-            options.MaxIntervals = 2000;
-        });
+            ["CustomSection:MaxFileSizeBytes"] = "20971520", // 20MB
+            ["CustomSection:EnablePerformanceLogging"] = "false"
+        };
 
-        // Assert
-        ServiceProvider provider = services.BuildServiceProvider();
-        IIntervalMerger merger = provider.GetRequiredService<IIntervalMerger>();
-        merger.Should().NotBeNull();
-
-        IOptions<IntervalMergerOptions> options = provider.GetRequiredService<IOptions<IntervalMergerOptions>>();
-        options.Value.EnablePerformanceLogging.Should().BeTrue();
-        options.Value.MaxIntervals.Should().Be(2000);
-    }
-
-    [Fact]
-    public void AddIntervalMerging_WithCustomOptionsNull_ThrowsArgumentNullException()
-    {
-        // Arrange
-        IServiceCollection services = new ServiceCollection();
-        Action<IntervalMergerOptions>? configureOptions = null;
-
-        // Act & Assert
-        Action act = () => services.AddIntervalMerging(configureOptions!);
-        act.Should().Throw<ArgumentNullException>()
-           .WithParameterName("configureOptions");
-    }
-
-    [Fact]
-    public void AddIntervalMerging_WithDefaultOptions_RegistersServicesCorrectly()
-    {
-        // Arrange
-        IServiceCollection services = new ServiceCollection();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(configurationData)
+            .Build();
 
         // Act
-        services.AddIntervalMerging();
+        services.AddFileReading(configuration, "CustomSection");
+        var serviceProvider = services.BuildServiceProvider();
 
         // Assert
-        ServiceProvider provider = services.BuildServiceProvider();
-        IIntervalMerger merger = provider.GetRequiredService<IIntervalMerger>();
-        merger.Should().NotBeNull();
-
-        IOptions<IntervalMergerOptions> options = provider.GetRequiredService<IOptions<IntervalMergerOptions>>();
-        options.Value.EnablePerformanceLogging.Should().BeFalse(); // Default value
-        options.Value.MaxIntervals.Should().Be(10000); // Default value
+        var options = serviceProvider.GetRequiredService<IOptions<FileReaderOptions>>();
+        Assert.Equal(20971520L, options.Value.MaxFileSizeBytes);
+        Assert.False(options.Value.EnablePerformanceLogging);
     }
 
     [Fact]
-    public void AddIntervalMerging_WithDefaultOptionsNullServices_ThrowsArgumentNullException()
+    public void AddFileReading_MultipleRegistrations_LastConfigurationWins()
     {
         // Arrange
-        IServiceCollection? services = null;
-
-        // Act & Assert
-        Action act = () => services!.AddIntervalMerging();
-        act.Should().Throw<ArgumentNullException>()
-           .WithParameterName("services");
-    }
-
-    [Fact]
-    public void AddIntervalMerging_RegistersAsSingleton()
-    {
-        // Arrange
-        IServiceCollection services = new ServiceCollection();
+        var services = new ServiceCollection();
 
         // Act
-        services.AddIntervalMerging();
+        services.AddFileReading(options => options.MaxFileSizeBytes = 1024);
+        services.AddFileReading(options => options.MaxFileSizeBytes = 2048);
+        var serviceProvider = services.BuildServiceProvider();
 
         // Assert
-        ServiceProvider provider = services.BuildServiceProvider();
-        IIntervalMerger merger1 = provider.GetRequiredService<IIntervalMerger>();
-        IIntervalMerger merger2 = provider.GetRequiredService<IIntervalMerger>();
-        
-        merger1.Should().BeSameAs(merger2);
+        var options = serviceProvider.GetRequiredService<IOptions<FileReaderOptions>>();
+        Assert.Equal(2048L, options.Value.MaxFileSizeBytes);
+    }
+
+    [Fact]
+    public void AddFileReading_ServiceLifetime_IsScoped()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+
+        // Act
+        services.AddFileReading();
+        var serviceProvider = services.BuildServiceProvider();
+
+        // Assert - Create two scopes and verify different instances
+        using (var scope1 = serviceProvider.CreateScope())
+        using (var scope2 = serviceProvider.CreateScope())
+        {
+            var fileReader1 = scope1.ServiceProvider.GetRequiredService<IFileReader>();
+            var fileReader2 = scope2.ServiceProvider.GetRequiredService<IFileReader>();
+            
+            Assert.NotSame(fileReader1, fileReader2);
+        }
+
+        // Assert - Within same scope, same instance
+        using (var scope = serviceProvider.CreateScope())
+        {
+            var fileReader1 = scope.ServiceProvider.GetRequiredService<IFileReader>();
+            var fileReader2 = scope.ServiceProvider.GetRequiredService<IFileReader>();
+            
+            Assert.Same(fileReader1, fileReader2);
+        }
     }
 } 

@@ -1,364 +1,236 @@
-using FluentAssertions;
 using Microsoft.Extensions.Options;
-using MergeIntervals.Core.Configuration;
-using MergeIntervals.Core.Implementations;
-using MergeIntervals.Core.Interfaces;
+using ListFile.Core.Configuration;
+using ListFile.Core.Implementations;
+using ListFile.Core.Interfaces;
+using Xunit;
 
-namespace MergeIntervals.Tests.Implementations;
+namespace ListFile.Tests.Implementations;
 
 /// <summary>
-/// Unit tests for the <see cref="IntervalMerger"/> class.
+/// Tests for the FileReader class.
 /// </summary>
-public class IntervalMergerTests
+public class FileReaderTests : IDisposable
 {
-    private readonly IntervalMerger intervalMerger;
-    private readonly IntervalMergerOptions defaultOptions;
+    private readonly List<string> testFiles;
+    private readonly FileReader fileReader;
 
-    public IntervalMergerTests()
+    public FileReaderTests()
     {
-        defaultOptions = new IntervalMergerOptions();
-        IOptions<IntervalMergerOptions> options = Options.Create(defaultOptions);
-        intervalMerger = new IntervalMerger(options);
+        testFiles = new List<string>();
+        var options = Options.Create(new FileReaderOptions
+        {
+            EnablePerformanceLogging = false,
+            MaxFileSizeBytes = 1024 * 1024, // 1MB for tests
+            SmallFileThresholdBytes = 1024 // 1KB for tests
+        });
+        fileReader = new FileReader(options);
+    }
+
+    public void Dispose()
+    {
+        // Clean up test files
+        foreach (var file in testFiles)
+        {
+            if (File.Exists(file))
+            {
+                File.Delete(file);
+            }
+        }
+    }
+
+    private string CreateTestFile(string fileName, string[] lines)
+    {
+        File.WriteAllLines(fileName, lines);
+        testFiles.Add(fileName);
+        return fileName;
     }
 
     [Fact]
     public void Constructor_NullOptions_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Action act = () => new IntervalMerger(null!);
-        act.Should().Throw<ArgumentNullException>()
-           .WithParameterName("options");
+        Assert.Throws<ArgumentNullException>(() => new FileReader(null!));
     }
 
     [Fact]
-    public void Merge_NullIntervals_ThrowsArgumentNullException()
+    public void ReadLastLines_NullFilePath_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Action act = () => intervalMerger.Merge(null!);
-        act.Should().Throw<ArgumentNullException>()
-           .WithParameterName("intervals");
+        Assert.Throws<ArgumentNullException>(() => fileReader.ReadLastLines(null!));
+        Assert.Throws<ArgumentNullException>(() => fileReader.ReadLastLines(""));
+        Assert.Throws<ArgumentNullException>(() => fileReader.ReadLastLines("  "));
     }
 
     [Fact]
-    public async Task MergeAsync_NullIntervals_ThrowsArgumentNullException()
-    {
-        // Act & Assert
-        Func<Task> act = async () => await intervalMerger.MergeAsync(null!);
-        await act.Should().ThrowAsync<ArgumentNullException>()
-                 .WithParameterName("intervals");
-    }
-
-    [Fact]
-    public void Merge_EmptyList_ReturnsEmptyList()
+    public void ReadLastLines_InvalidLineCount_ThrowsArgumentException()
     {
         // Arrange
-        List<IInterval> intervals = new();
-
-        // Act
-        IEnumerable<IInterval> result = intervalMerger.Merge(intervals);
-
-        // Assert
-        result.Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task MergeAsync_EmptyList_ReturnsEmptyList()
-    {
-        // Arrange
-        List<IInterval> intervals = new();
-
-        // Act
-        IEnumerable<IInterval> result = await intervalMerger.MergeAsync(intervals);
-
-        // Assert
-        result.Should().BeEmpty();
-    }
-
-    [Fact]
-    public void Merge_SingleInterval_ReturnsSingleInterval()
-    {
-        // Arrange
-        List<IInterval> intervals = new() { new Interval(1, 4) };
-
-        // Act
-        IEnumerable<IInterval> result = intervalMerger.Merge(intervals);
-
-        // Assert
-        result.Should().ContainSingle()
-              .Which.Should().BeEquivalentTo(new Interval(1, 4));
-    }
-
-    [Fact]
-    public void Merge_RequirementExample_ReturnsExpectedResult()
-    {
-        // Arrange - Input: [[1, 4], [2, 6], [8, 10], [15, 18]]
-        // Expected: [[1, 6], [8, 10], [15, 18]]
-        List<IInterval> intervals = new()
-        {
-            new Interval(1, 4),
-            new Interval(2, 6),
-            new Interval(8, 10),
-            new Interval(15, 18)
-        };
-
-        List<IInterval> expected = new()
-        {
-            new Interval(1, 6),
-            new Interval(8, 10),
-            new Interval(15, 18)
-        };
-
-        // Act
-        IEnumerable<IInterval> result = intervalMerger.Merge(intervals);
-
-        // Assert
-        result.Should().BeEquivalentTo(expected);
-    }
-
-    [Fact]
-    public async Task MergeAsync_RequirementExample_ReturnsExpectedResult()
-    {
-        // Arrange - Input: [[1, 4], [2, 6], [8, 10], [15, 18]]
-        // Expected: [[1, 6], [8, 10], [15, 18]]
-        List<IInterval> intervals = new()
-        {
-            new Interval(1, 4),
-            new Interval(2, 6),
-            new Interval(8, 10),
-            new Interval(15, 18)
-        };
-
-        List<IInterval> expected = new()
-        {
-            new Interval(1, 6),
-            new Interval(8, 10),
-            new Interval(15, 18)
-        };
-
-        // Act
-        IEnumerable<IInterval> result = await intervalMerger.MergeAsync(intervals);
-
-        // Assert
-        result.Should().BeEquivalentTo(expected);
-    }
-
-    [Fact]
-    public void Merge_OverlappingIntervals_MergesCorrectly()
-    {
-        // Arrange
-        List<IInterval> intervals = new()
-        {
-            new Interval(1, 3),
-            new Interval(2, 6),
-            new Interval(8, 10),
-            new Interval(15, 18)
-        };
-
-        List<IInterval> expected = new()
-        {
-            new Interval(1, 6),
-            new Interval(8, 10),
-            new Interval(15, 18)
-        };
-
-        // Act
-        IEnumerable<IInterval> result = intervalMerger.Merge(intervals);
-
-        // Assert
-        result.Should().BeEquivalentTo(expected);
-    }
-
-    [Fact]
-    public void Merge_TouchingIntervals_MergesCorrectly()
-    {
-        // Arrange - intervals that touch at boundaries should merge
-        List<IInterval> intervals = new()
-        {
-            new Interval(1, 4),
-            new Interval(4, 5)
-        };
-
-        List<IInterval> expected = new()
-        {
-            new Interval(1, 5)
-        };
-
-        // Act
-        IEnumerable<IInterval> result = intervalMerger.Merge(intervals);
-
-        // Assert
-        result.Should().BeEquivalentTo(expected);
-    }
-
-    [Fact]
-    public void Merge_NonOverlappingIntervals_ReturnsOriginalIntervals()
-    {
-        // Arrange
-        List<IInterval> intervals = new()
-        {
-            new Interval(1, 2),
-            new Interval(3, 5),
-            new Interval(6, 7)
-        };
-
-        // Act
-        IEnumerable<IInterval> result = intervalMerger.Merge(intervals);
-
-        // Assert
-        result.Should().BeEquivalentTo(intervals);
-    }
-
-    [Fact]
-    public void Merge_UnsortedIntervals_SortsAndMergesCorrectly()
-    {
-        // Arrange - unsorted input
-        List<IInterval> intervals = new()
-        {
-            new Interval(15, 18),
-            new Interval(1, 4),
-            new Interval(8, 10),
-            new Interval(2, 6)
-        };
-
-        List<IInterval> expected = new()
-        {
-            new Interval(1, 6),
-            new Interval(8, 10),
-            new Interval(15, 18)
-        };
-
-        // Act
-        IEnumerable<IInterval> result = intervalMerger.Merge(intervals);
-
-        // Assert
-        result.Should().BeEquivalentTo(expected);
-    }
-
-    [Fact]
-    public void Merge_AllOverlappingIntervals_ReturnsSingleInterval()
-    {
-        // Arrange
-        List<IInterval> intervals = new()
-        {
-            new Interval(1, 4),
-            new Interval(2, 5),
-            new Interval(3, 6),
-            new Interval(4, 7)
-        };
-
-        List<IInterval> expected = new()
-        {
-            new Interval(1, 7)
-        };
-
-        // Act
-        IEnumerable<IInterval> result = intervalMerger.Merge(intervals);
-
-        // Assert
-        result.Should().BeEquivalentTo(expected);
-    }
-
-    [Fact]
-    public void Merge_ExceedsMaxIntervals_ThrowsArgumentException()
-    {
-        // Arrange
-        IntervalMergerOptions options = new() { MaxIntervals = 2 };
-        IOptions<IntervalMergerOptions> optionsWrapper = Options.Create(options);
-        IntervalMerger merger = new(optionsWrapper);
-
-        List<IInterval> intervals = new()
-        {
-            new Interval(1, 2),
-            new Interval(3, 4),
-            new Interval(5, 6)
-        };
+        var testFile = CreateTestFile("test.txt", new[] { "line 1" });
 
         // Act & Assert
-        Action act = () => merger.Merge(intervals);
-        act.Should().Throw<ArgumentException>()
-           .WithMessage("Number of intervals exceeds maximum allowed (2). (Parameter 'intervals')");
-    }
-
-    [Theory]
-    [InlineData(-10, -5, -4, -1)] // Negative intervals - no overlap
-    [InlineData(0, 0, 1, 1)] // Zero-length intervals - no overlap
-    public void Merge_EdgeCases_NoOverlap_WorksCorrectly(int start1, int end1, int start2, int end2)
-    {
-        // Arrange
-        List<IInterval> intervals = new()
-        {
-            new Interval(start1, end1),
-            new Interval(start2, end2)
-        };
-
-        List<IInterval> expected = new()
-        {
-            new Interval(start1, end1),
-            new Interval(start2, end2)
-        };
-
-        // Act
-        IEnumerable<IInterval> result = intervalMerger.Merge(intervals);
-
-        // Assert
-        result.Should().BeEquivalentTo(expected);
+        Assert.Throws<ArgumentException>(() => fileReader.ReadLastLines(testFile, 0));
+        Assert.Throws<ArgumentException>(() => fileReader.ReadLastLines(testFile, -1));
     }
 
     [Fact]
-    public void Merge_EdgeCases_LargeNumbers_WorksCorrectly()
+    public void ReadLastLines_NonExistentFile_ThrowsFileNotFoundException()
     {
-        // Arrange - intervals that DO overlap
-        List<IInterval> intervals = new()
-        {
-            new Interval(100, 200),
-            new Interval(150, 300)
-        };
-
-        List<IInterval> expected = new()
-        {
-            new Interval(100, 300)
-        };
-
-        // Act
-        IEnumerable<IInterval> result = intervalMerger.Merge(intervals);
-
-        // Assert
-        result.Should().BeEquivalentTo(expected);
+        // Act & Assert
+        Assert.Throws<FileNotFoundException>(() => fileReader.ReadLastLines("non_existent_file.txt"));
     }
 
     [Fact]
-    public async Task Merge_ThreadSafety_MultipleThreads_WorksCorrectly()
+    public void ReadLastLines_EmptyFile_ReturnsEmptyCollection()
     {
         // Arrange
-        List<IInterval> intervals = new()
-        {
-            new Interval(1, 4),
-            new Interval(2, 6),
-            new Interval(8, 10),
-            new Interval(15, 18)
+        var testFile = CreateTestFile("empty.txt", Array.Empty<string>());
+
+        // Act
+        var result = fileReader.ReadLastLines(testFile, 10);
+
+        // Assert
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void ReadLastLines_SingleLineFile_ReturnsSingleLine()
+    {
+        // Arrange
+        var testFile = CreateTestFile("single.txt", new[] { "Only line" });
+
+        // Act
+        var result = fileReader.ReadLastLines(testFile, 10).ToList();
+
+        // Assert
+        Assert.Single(result);
+        Assert.Equal(1, result[0].LineNumber);
+        Assert.Equal("Only line", result[0].Content);
+    }
+
+    [Fact]
+    public void ReadLastLines_SmallFile_ReturnsCorrectLastLines()
+    {
+        // Arrange
+        var lines = new[] { "Line 1", "Line 2", "Line 3", "Line 4", "Line 5" };
+        var testFile = CreateTestFile("small.txt", lines);
+
+        // Act
+        var result = fileReader.ReadLastLines(testFile, 3).ToList();
+
+        // Assert
+        Assert.Equal(3, result.Count);
+        Assert.Equal(3, result[0].LineNumber);
+        Assert.Equal("Line 3", result[0].Content);
+        Assert.Equal(4, result[1].LineNumber);
+        Assert.Equal("Line 4", result[1].Content);
+        Assert.Equal(5, result[2].LineNumber);
+        Assert.Equal("Line 5", result[2].Content);
+    }
+
+    [Fact]
+    public void ReadLastLines_RequestMoreLinesThanAvailable_ReturnsAllLines()
+    {
+        // Arrange
+        var lines = new[] { "Line 1", "Line 2", "Line 3" };
+        var testFile = CreateTestFile("short.txt", lines);
+
+        // Act
+        var result = fileReader.ReadLastLines(testFile, 10).ToList();
+
+        // Assert
+        Assert.Equal(3, result.Count);
+        Assert.Equal(1, result[0].LineNumber);
+        Assert.Equal("Line 1", result[0].Content);
+        Assert.Equal(2, result[1].LineNumber);
+        Assert.Equal("Line 2", result[1].Content);
+        Assert.Equal(3, result[2].LineNumber);
+        Assert.Equal("Line 3", result[2].Content);
+    }
+
+    [Fact]
+    public void ReadLastLines_DefaultLineCount_ReturnsLast10Lines()
+    {
+        // Arrange
+        var lines = Enumerable.Range(1, 15).Select(i => $"Line {i}").ToArray();
+        var testFile = CreateTestFile("default_count.txt", lines);
+
+        // Act
+        var result = fileReader.ReadLastLines(testFile).ToList();
+
+        // Assert
+        Assert.Equal(10, result.Count);
+        Assert.Equal(6, result[0].LineNumber);
+        Assert.Equal("Line 6", result[0].Content);
+        Assert.Equal(15, result[9].LineNumber);
+        Assert.Equal("Line 15", result[9].Content);
+    }
+
+    [Fact]
+    public async Task ReadLastLinesAsync_ValidFile_ReturnsCorrectLines()
+    {
+        // Arrange
+        var lines = new[] { "Line 1", "Line 2", "Line 3", "Line 4", "Line 5" };
+        var testFile = CreateTestFile("async_test.txt", lines);
+
+        // Act
+        var result = (await fileReader.ReadLastLinesAsync(testFile, 2)).ToList();
+
+        // Assert
+        Assert.Equal(2, result.Count);
+        Assert.Equal(4, result[0].LineNumber);
+        Assert.Equal("Line 4", result[0].Content);
+        Assert.Equal(5, result[1].LineNumber);
+        Assert.Equal("Line 5", result[1].Content);
+    }
+
+    [Fact]
+    public async Task ReadLastLinesAsync_NullFilePath_ThrowsArgumentNullException()
+    {
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentNullException>(() => fileReader.ReadLastLinesAsync(null!));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => fileReader.ReadLastLinesAsync(""));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => fileReader.ReadLastLinesAsync("  "));
+    }
+
+    [Fact]
+    public void ReadLastLines_LinesWithSpecialCharacters_HandlesCorrectly()
+    {
+        // Arrange
+        var lines = new[] { 
+            "Line with «special» characters", 
+            "Line with\ttabs", 
+            "Line with spaces   ", 
+            "Line with 数字 and símbolos" 
         };
+        var testFile = CreateTestFile("special_chars.txt", lines);
 
-        List<IInterval> expected = new()
-        {
-            new Interval(1, 6),
-            new Interval(8, 10),
-            new Interval(15, 18)
-        };
+        // Act
+        var result = fileReader.ReadLastLines(testFile, 2).ToList();
 
-        // Act - run multiple times concurrently
-        List<Task<IEnumerable<IInterval>>> tasks = new();
-        for (int i = 0; i < 10; i++)
-        {
-            tasks.Add(Task.Run(() => intervalMerger.Merge(intervals)));
-        }
+        // Assert
+        Assert.Equal(2, result.Count);
+        Assert.Equal(3, result[0].LineNumber);
+        Assert.Equal("Line with spaces   ", result[0].Content);
+        Assert.Equal(4, result[1].LineNumber);
+        Assert.Equal("Line with 数字 and símbolos", result[1].Content);
+    }
 
-        await Task.WhenAll(tasks);
+    [Fact]
+    public void ReadLastLines_LargeFile_PerformanceTest()
+    {
+        // Arrange
+        var lines = Enumerable.Range(1, 1000).Select(i => $"Line {i} with some content to make it longer").ToArray();
+        var testFile = CreateTestFile("large_test.txt", lines);
 
-        // Assert - all results should be the same
-        foreach (Task<IEnumerable<IInterval>> task in tasks)
-        {
-            IEnumerable<IInterval> result = await task;
-            result.Should().BeEquivalentTo(expected);
-        }
+        // Act
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var result = fileReader.ReadLastLines(testFile, 5).ToList();
+        stopwatch.Stop();
+
+        // Assert
+        Assert.Equal(5, result.Count);
+        Assert.Equal(996, result[0].LineNumber);
+        Assert.Equal(1000, result[4].LineNumber);
+        Assert.True(stopwatch.ElapsedMilliseconds < 1000, "Performance test should complete within 1 second");
     }
 } 

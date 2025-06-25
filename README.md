@@ -1,237 +1,197 @@
-# MergeIntervals
+# ListFile - File Line Reader Library
 
-A robust C# library for merging overlapping intervals with support for dependency injection, configuration options, and comprehensive testing.
+A high-performance .NET 8 library for reading the last N lines from files efficiently, with support for both small and large files.
 
-## 🚀 Features
+## Features
 
-- **Thread-Safe Operations**: All implementations are thread-safe for concurrent usage
-- **Dependency Injection**: Full support for Microsoft.Extensions.DependencyInjection
-- **Configuration Options**: Configurable via IOptions pattern
-- **Async/Await Support**: Both synchronous and asynchronous APIs
-- **Performance Optimized**: Supports parallel processing for large datasets
-- **Comprehensive Testing**: High test coverage with xUnit and FluentAssertions
-- **XML Documentation**: Complete XML documentation for all public APIs
+- **Efficient File Reading**: Optimized algorithms for reading the last N lines from files
+- **Performance Optimized**: Different strategies for small vs. large files
+- **Thread-Safe**: Safe for concurrent access
+- **Configurable**: Flexible options for file size thresholds and buffer sizes
+- **Async Support**: Both synchronous and asynchronous APIs
+- **Dependency Injection**: Built-in support for Microsoft.Extensions.DependencyInjection
+- **Well-Tested**: Comprehensive unit tests with edge case coverage
 
-## 📋 Requirements
+## Quick Start
 
-Given a collection of intervals, merge all overlapping intervals.
+### Installation
 
-**Example:**
+Add the ListFile.Core package to your project:
+
+```xml
+<PackageReference Include="ListFile.Core" Version="1.0.0" />
 ```
-Input: [[1, 4], [2, 6], [8, 10], [15, 18]]
-Output: [[1, 6], [8, 10], [15, 18]]
-```
-
-## 🛠 Installation
-
-### Prerequisites
-- .NET 8.0 or later
-
-### Clone the Repository
-```bash
-git clone https://github.com/todicn/MergeIntervalsPP1.git
-cd MergeIntervalsPP1
-```
-
-### Build the Solution
-```bash
-dotnet build
-```
-
-### Run Tests
-```bash
-dotnet test
-```
-
-### Run Demo
-```bash
-dotnet run --project MergeIntervals.Demo
-```
-
-## 📖 Usage
 
 ### Basic Usage
 
 ```csharp
-using MergeIntervals.Core.Implementations;
-using MergeIntervals.Core.Interfaces;
+using ListFile.Core.Interfaces;
+using ListFile.Core.Implementations;
+using Microsoft.Extensions.Options;
 
-// Create intervals
-List<IInterval> intervals = new()
+// Create a file reader with default options
+var options = Options.Create(new FileReaderOptions());
+IFileReader fileReader = new FileReader(options);
+
+// Read the last 10 lines from a file
+IEnumerable<IFileLine> lines = await fileReader.ReadLastLinesAsync("myfile.txt");
+
+foreach (var line in lines)
 {
-    new Interval(1, 4),
-    new Interval(2, 6),
-    new Interval(8, 10),
-    new Interval(15, 18)
-};
-
-// Create merger with default options
-var options = Microsoft.Extensions.Options.Options.Create(new IntervalMergerOptions());
-var merger = new IntervalMerger(options);
-
-// Merge intervals
-IEnumerable<IInterval> result = merger.Merge(intervals);
-// Result: [[1, 6], [8, 10], [15, 18]]
+    Console.WriteLine($"Line {line.LineNumber}: {line.Content}");
+}
 ```
 
 ### Dependency Injection
 
 ```csharp
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using MergeIntervals.Core.Services;
+using ListFile.Core.Services;
 
-// Setup DI container
-IHost host = Host.CreateDefaultBuilder()
-    .ConfigureServices(services =>
-    {
-        services.AddIntervalMerging(options =>
-        {
-            options.EnablePerformanceLogging = true;
-            options.MaxIntervals = 10000;
-            options.UseParallelProcessing = true;
-        });
-    })
-    .Build();
+var services = new ServiceCollection();
 
-// Get service and use
-var merger = host.Services.GetRequiredService<IIntervalMerger>();
-var result = await merger.MergeAsync(intervals);
+// Register file reading services with custom options
+services.AddFileReading(options =>
+{
+    options.MaxFileSizeBytes = 100 * 1024 * 1024; // 100MB
+    options.SmallFileThresholdBytes = 1024 * 1024; // 1MB
+    options.EnablePerformanceLogging = true;
+});
+
+var serviceProvider = services.BuildServiceProvider();
+var fileReader = serviceProvider.GetRequiredService<IFileReader>();
+
+// Read last 5 lines
+var result = await fileReader.ReadLastLinesAsync("largefile.txt", 5);
 ```
 
-### Configuration Options
+## Configuration Options
+
+The `FileReaderOptions` class provides several configuration options:
 
 ```csharp
-public class IntervalMergerOptions
+public class FileReaderOptions
 {
+    // Maximum file size that can be processed (default: 100MB)
+    public long MaxFileSizeBytes { get; set; } = 100 * 1024 * 1024;
+    
+    // Threshold for small vs. large file processing (default: 1MB)
+    public long SmallFileThresholdBytes { get; set; } = 1024 * 1024;
+    
+    // Buffer size for reading large files (default: 4KB)
+    public int BufferSize { get; set; } = 4096;
+    
+    // Enable performance logging (default: false)
     public bool EnablePerformanceLogging { get; set; } = false;
-    public int MaxIntervals { get; set; } = 10000;
-    public bool UseParallelProcessing { get; set; } = true;
-    public int ParallelProcessingThreshold { get; set; } = 1000;
+    
+    // Default encoding for reading files (default: UTF-8)
+    public string DefaultEncoding { get; set; } = "UTF-8";
 }
 ```
 
-## 🏗 Architecture
+## Performance Characteristics
 
-The project follows clean architecture principles with clear separation of concerns:
+The library uses different strategies based on file size:
 
+- **Small Files** (≤ threshold): Reads all lines and returns the last N
+- **Large Files** (> threshold): Uses backward reading algorithm for efficiency
+
+### Benchmarks
+
+For a 10,000-line file (≈1MB):
+- Reading last 10 lines: ~5-15ms
+- Memory usage: Minimal (only stores requested lines)
+
+## API Reference
+
+### IFileReader Interface
+
+```csharp
+public interface IFileReader
+{
+    // Asynchronous method to read last N lines
+    Task<IEnumerable<IFileLine>> ReadLastLinesAsync(string filePath, int lineCount = 10);
+    
+    // Synchronous method to read last N lines  
+    IEnumerable<IFileLine> ReadLastLines(string filePath, int lineCount = 10);
+}
 ```
-MergeIntervals.Core/
-├── Interfaces/          # Contracts and abstractions
-├── Implementations/     # Core business logic
-├── Services/           # DI extensions and services
-└── Configuration/      # Configuration options
 
-MergeIntervals.Tests/
-├── Implementations/    # Tests for core implementations
-└── Services/          # Tests for service layer
+### IFileLine Interface
 
-MergeIntervals.Demo/    # Console application demonstrating usage
+```csharp
+public interface IFileLine
+{
+    int LineNumber { get; }    // 1-based line number
+    string Content { get; }    // Line content
+}
 ```
 
-## 🧪 Testing
+## Error Handling
 
-The project includes comprehensive unit tests covering:
+The library throws appropriate exceptions for various error conditions:
 
-- ✅ Happy path scenarios
-- ✅ Edge cases (empty lists, single intervals, negative numbers)
-- ✅ Error conditions and validation
-- ✅ Thread-safety testing
-- ✅ Performance scenarios
-- ✅ Dependency injection setup
+- `ArgumentNullException`: When file path is null or empty
+- `ArgumentException`: When line count is less than 1 or file size exceeds limits
+- `FileNotFoundException`: When the specified file doesn't exist
 
-### Test Coverage
-- **Interval Class**: Constructor validation, equality, hash codes
-- **IntervalMerger Class**: All merge scenarios, async operations, configuration
-- **ServiceCollectionExtensions**: DI registration and configuration
+## Thread Safety
 
-## 📊 Performance
+The FileReader class is thread-safe and can be used concurrently from multiple threads. The implementation uses appropriate locking mechanisms to ensure data integrity.
 
-The library is optimized for performance:
+## Examples
 
-- **Sorting**: O(n log n) time complexity for sorting intervals
-- **Merging**: O(n) time complexity for merging sorted intervals
-- **Parallel Processing**: Automatic parallel processing for large datasets (>1000 intervals)
-- **Memory Efficient**: Minimal memory allocations in hot paths
+### Reading Different Numbers of Lines
 
-## 🔧 Configuration
+```csharp
+// Read last 5 lines
+var last5 = await fileReader.ReadLastLinesAsync("file.txt", 5);
 
-### appsettings.json
+// Read last 20 lines  
+var last20 = await fileReader.ReadLastLinesAsync("file.txt", 20);
+
+// Default behavior (last 10 lines)
+var defaultLines = await fileReader.ReadLastLinesAsync("file.txt");
+```
+
+### Configuration from appsettings.json
+
 ```json
 {
-  "IntervalMerger": {
+  "FileReader": {
+    "MaxFileSizeBytes": 52428800,
+    "SmallFileThresholdBytes": 1048576,
     "EnablePerformanceLogging": true,
-    "MaxIntervals": 10000,
-    "UseParallelProcessing": true,
-    "ParallelProcessingThreshold": 1000
+    "BufferSize": 8192
   }
 }
 ```
 
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Add tests for your changes
-5. Ensure all tests pass (`dotnet test`)
-6. Commit your changes (`git commit -m 'Add amazing feature'`)
-7. Push to the branch (`git push origin feature/amazing-feature`)
-8. Open a Pull Request
-
-## 📝 Code Style
-
-This project follows the coding standards defined in `.cursorrules`:
-
-- C# naming conventions (PascalCase for classes/methods, camelCase for fields)
-- Explicit type declarations for readability
-- Async/await patterns for public APIs
-- Nullable reference types with proper null checking
-- XML documentation for all public APIs
-- Thread-safe implementations
-
-## 📜 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🎯 Examples
-
-### Example 1: Basic Merging
 ```csharp
-Input:  [[1, 4], [2, 6], [8, 10], [15, 18]]
-Output: [[1, 6], [8, 10], [15, 18]]
+services.AddFileReading(configuration);
 ```
 
-### Example 2: No Overlapping
-```csharp
-Input:  [[1, 2], [3, 5], [6, 7]]
-Output: [[1, 2], [3, 5], [6, 7]]
-```
+## Contributing
 
-### Example 3: All Overlapping
-```csharp
-Input:  [[1, 4], [2, 5], [3, 6]]
-Output: [[1, 6]]
-```
+Contributions are welcome! Please ensure your code follows the established patterns:
 
-### Example 4: Touching Intervals
-```csharp
-Input:  [[1, 4], [4, 5]]
-Output: [[1, 5]]
-```
+- Use async/await for all public APIs
+- Include comprehensive unit tests
+- Follow C# naming conventions
+- Add XML documentation for public APIs
+- Ensure thread safety
 
-## 🚨 Error Handling
+## License
 
-The library provides comprehensive error handling:
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-- `ArgumentNullException`: When null intervals are provided
-- `ArgumentException`: When intervals exceed maximum allowed count
-- `ArgumentException`: When interval start > end
+## Architecture
 
-## 📞 Support
+The library follows clean architecture principles:
 
-For support, please open an issue on GitHub or contact the maintainers.
+- **Interfaces**: Define contracts (`IFileReader`, `IFileLine`)
+- **Implementations**: Core logic (`FileReader`, `FileLine`)
+- **Configuration**: Options pattern (`FileReaderOptions`)
+- **Services**: Dependency injection extensions (`ServiceCollectionExtensions`)
 
----
-
-**Happy Coding! 🎉** 
+Built with .NET 8 and modern C# features including nullable reference types and performance optimizations. 

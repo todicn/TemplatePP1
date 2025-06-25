@@ -1,23 +1,29 @@
-namespace MergeIntervals.Core.Interfaces;
+namespace ListFile.Core.Interfaces;
 
 /// <summary>
-/// Defines the contract for merging overlapping intervals.
+/// Defines the contract for reading lines from files.
 /// </summary>
-public interface IIntervalMerger
+public interface IFileReader
 {
     /// <summary>
-    /// Merges overlapping intervals from the provided collection.
+    /// Reads the last N lines from a file asynchronously.
     /// </summary>
-    /// <param name="intervals">The collection of intervals to merge.</param>
-    /// <returns>A task that represents the asynchronous operation. The task result contains the merged intervals.</returns>
-    /// <exception cref="ArgumentNullException">Thrown when intervals is null.</exception>
-    Task<IEnumerable<IInterval>> MergeAsync(IEnumerable<IInterval> intervals);
+    /// <param name="filePath">The path to the file to read.</param>
+    /// <param name="lineCount">The number of lines to read from the end of the file. Default is 10.</param>
+    /// <returns>A task that represents the asynchronous operation. The task result contains the last N lines from the file.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when filePath is null or empty.</exception>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    /// <exception cref="ArgumentException">Thrown when lineCount is less than 1.</exception>
+    Task<IEnumerable<IFileLine>> ReadLastLinesAsync(string filePath, int lineCount = 10);
 
     /// <summary>
-    /// Merges overlapping intervals from the provided collection synchronously.
+    /// Reads the last N lines from a file synchronously.
     /// </summary>
-    /// <param name="intervals">The collection of intervals to merge.</param>
-    /// <returns>The merged intervals.</returns>
-    /// <exception cref="ArgumentNullException">Thrown when intervals is null.</exception>
-    IEnumerable<IInterval> Merge(IEnumerable<IInterval> intervals);
+    /// <param name="filePath">The path to the file to read.</param>
+    /// <param name="lineCount">The number of lines to read from the end of the file. Default is 10.</param>
+    /// <returns>The last N lines from the file.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when filePath is null or empty.</exception>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    /// <exception cref="ArgumentException">Thrown when lineCount is less than 1.</exception>
+    IEnumerable<IFileLine> ReadLastLines(string filePath, int lineCount = 10);
 } 
